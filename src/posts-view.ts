@@ -1,6 +1,11 @@
 import "./style.css";
 import "./posts.css";
-import { PostManager, Publisher, Subscriber } from "./post-model";
+import {
+  CommentsManager,
+  PostManager,
+  Publisher,
+  Subscriber,
+} from "./post-model";
 
 export class PostView implements Subscriber {
   postTitleElement: HTMLHeadingElement | null = null;
@@ -8,10 +13,14 @@ export class PostView implements Subscriber {
   prevButton: HTMLButtonElement | null = null;
   nextButton: HTMLButtonElement | null = null;
   commentButton: HTMLButtonElement | null = null;
+  postId: number = 0;
+  comments: HTMLParagraphElement | null = null;
+  postNumberDisplay: HTMLDivElement | null = null;
 
   constructor() {
     document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div class="container">
+      <div data-testid="post-number" class="post-number-display"></div>
     <section>
     <nav>
       <button data-testid="prev-button">Previous</button>
@@ -23,7 +32,7 @@ export class PostView implements Subscriber {
     <section class="comment-section">
     <button data-testid="comments-button">View Comments</button>
     <section class="comments">
-     Comments of current post goes here
+    <p data-testid="comment-section"></p>
     </section>
     </section>
   </div>
@@ -35,10 +44,16 @@ export class PostView implements Subscriber {
     this.commentButton = document.querySelector(
       '[data-testid="comments-button"]'
     );
+    this.comments = document.querySelector('[data-testid="comment-section"]');
+    this.postNumberDisplay = document.querySelector(
+      '[data-testid="post-number"]'
+    );
+
     console.assert(this.postDescription !== null, "postDescription is null");
     console.assert(this.postTitleElement !== null, "postTitle is null");
     //similarly add other asserts
   }
+
   update(manager: Publisher) {
     if (manager instanceof PostManager) {
       //check if model is in available state,if so we are good to consume posts data
@@ -53,6 +68,12 @@ export class PostView implements Subscriber {
           {
             this.postTitleElement!.textContent = post!.title;
             this.postDescription!.textContent = post!.body;
+            if (post?.id) {
+              this.postId = post?.id;
+              this.postNumberDisplay!.innerHTML = `<p>${this.postId}/${
+                manager.getPosts().length
+              }</p>`;
+            }
           }
           break;
         case "pending":
@@ -67,6 +88,28 @@ export class PostView implements Subscriber {
             this.postDescription!.textContent = "Failed to load";
           }
           break;
+      }
+    } else if (manager instanceof CommentsManager) {
+      const comments = manager.getCommentsForPost(this.postId);
+      console.log(this.postId);
+      switch (manager.getModelStatus()) {
+        case "available": {
+          this.comments!.innerHTML = "";
+          for (let i = 0; i < comments!.length; i++) {
+            this.comments!.innerHTML += `<p>${comments![i].body}</p>`;
+          }
+          break;
+        }
+
+        case "pending": {
+          this.comments!.innerHTML = "Loading...";
+          break;
+        }
+
+        case "failure": {
+          this.comments!.innerHTML = "Failed to load";
+          break;
+        }
       }
     }
   }
